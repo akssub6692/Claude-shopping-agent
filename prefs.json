@@ -1,0 +1,39 @@
+{
+  "_readme": "Your settings. Fee and voucher numbers are estimates used only to rank apps; the real fees are read from the cart before you approve.",
+  "delivery": {
+    "pincode": null,
+    "addressLabel": "Home"
+  },
+  "categories": ["grocery"],
+  "apps": {
+    "blinkit": {
+      "name": "Blinkit",
+      "url": "https://blinkit.com",
+      "categories": ["grocery"],
+      "playbook": "stores/blinkit.md",
+      "fees": { "delivery": 30, "freeDeliveryAbove": 199, "handling": 9 }
+    },
+    "bigbasket": {
+      "name": "BigBasket",
+      "url": "https://www.bigbasket.com",
+      "categories": ["grocery"],
+      "playbook": "stores/bigbasket.md",
+      "fees": { "delivery": 30, "freeDeliveryAbove": 199, "handling": 0 }
+    }
+  },
+  "vouchers": {
+    "source": "iShop",
+    "blinkit": { "denominations": [100, 250, 500, 1000, 2000], "discountPct": 0 },
+    "bigbasket": { "denominations": [100, 250, 500, 1000, 2000], "discountPct": 0 }
+  },
+  "budgetCap": null,
+  "premiumBrands": [
+    "Akshayakalpa", "Country Delight", "Milky Mist", "Epigamia", "24 Mantra Organic", "Pro Nature", "Organic Tattva",
+    "Conscious Food", "Two Brothers Organic Farms", "Borges", "Figaro", "Del Monte", "Lindt", "The Baker's Dozen",
+    "English Oven", "Kapiva", "Happilo", "Urban Platter", "Paper Boat", "Raw Pressery", "Tata Sampann"
+  ],
+  "premiumKeywords": [
+    "organic", "a2", "cold pressed", "premium", "artisanal", "single origin", "extra virgin", "grass fed",
+    "free range", "select", "gold", "farm fresh", "unpolished", "sourdough", "imported"
+  ]
+}

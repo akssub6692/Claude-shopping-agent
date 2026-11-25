@@ -1,0 +1,6 @@
+# Private: wallet balances, voucher codes, orders, your taste profile
+state/
+memory/
+node_modules/
+*.tmp
+.DS_Store
