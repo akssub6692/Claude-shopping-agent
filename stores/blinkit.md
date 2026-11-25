@@ -1,10 +1,11 @@
 # Blinkit
 
 - **Site:** https://blinkit.com
-- **Last verified:** not yet. Verify each section on the first pilot run and fill in what you see.
+- **Last verified:** not yet. Fill in what Claude in Chrome actually finds on the first pilot run.
+- **Used by:** Claude in Chrome, through the tasks the Grocery Concierge page copies (`lib/prompts.js`).
 
 ## Login check
-- Top-right shows **Account** (logged in) or **Login** (logged out). If logged out, stop: the user logs in with phone + OTP in the browser pane.
+- Top-right shows **Account** (logged in) or **Login** (logged out). If logged out, stop: I log in with phone + OTP in Chrome.
 - The delivery address and ETA ("Delivery in 12 minutes") are shown top-left. Check the address matches `prefs.json → delivery`. Changing the address is the user's call.
 
 ## Search

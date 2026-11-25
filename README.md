@@ -1,66 +1,63 @@
 # Claude shopping agent
 
-A shopping concierge built on Claude. It redeems iShop gift vouchers into app wallets, shortlists products, compares apps by **wallet balance, price and availability**, and builds the cart. It always stops before payment.
-
-**Pilot scope: Blinkit + BigBasket, groceries.** More apps (Instamart, Amazon Now, Swiggy, Zomato, Amazon, Myntra) are added once one full flow works on both pilot apps.
+A grocery concierge for **Blinkit and BigBasket** that works entirely from a browser: no desktop app, nothing to install except the Claude in Chrome extension. It redeems iShop vouchers into app wallets, shortlists premium products, compares the two apps by **wallet balance, price and availability**, and fills the cart. **You always place the order.**
 
 ## How it works
 
 ```
- Intent UI (localhost:4317)          Claude desktop app (/shop skill = orchestrator)
- ├─ Add vouchers to wallets  ──►     ├─ voucher-redeemer  Gmail → codes → redeem in app → verify balance
- └─ Buy items (list)         ──►     ├─ wallet-manager    read balances
-        ▲    picks / approve         ├─ quick-commerce    search Blinkit + BigBasket / build approved cart
-        └────────────────────────    └─ comparator        tools/shop.js shortlist + compare (deterministic)
-                     state/ (balances, vouchers, intents)  ·  memory/ (your taste)  — both gitignored
+ Grocery Concierge page (claude.ai artifact)                     Claude in Chrome (your logged-in Chrome)
+ ┌──────────────────────────────────────────┐   copy task ──►   ┌─────────────────────────────────────┐
+ │ 1. New request: "Milk 1L x2, Atta 5kg"   │                   │ searches Blinkit + BigBasket,       │
+ │ 2. Paste reply ◄─────────────────────────┼─── JSON reply ◄── │ reads wallets, never pays           │
+ │ 3. Top 3 per item → you pick             │                   └─────────────────────────────────────┘
+ │ 4. Blinkit vs BigBasket table → approve  │   copy cart task ──►  fills the cart, stops at the bill
+ │ 5. Paste bill → you place the order      │ ◄── JSON reply ──
+ └──────────────────────────────────────────┘
+ Saved privately in the page: requests, wallets, vouchers (last 4 characters only), your taste.
 ```
 
-1. **Vouchers**: you buy a voucher on iShop. The agent finds the code in Gmail, redeems it in the app and checks that the balance went up. You don't need to approve this step.
-2. **Purchase**: you list items. The agent searches both apps (15–20 results per item) and scores them: relevance, your past picks, premium signal, rating, discount. It merges the same product across apps and shows the **top 3 per item**. You pick (products it knows you like are picked automatically), then it compares apps:
-
-   | App | Total | Wallet | You pay | Items | ETA |
-   |---|---|---|---|---|---|
-
-   You approve one app. The agent fills the cart and stops at checkout. **You place the order.**
-3. **Memory**: every pick is saved. After you've picked the same product twice, it's chosen automatically. You can say "I don't like X" at any time. `memory/` stays on your machine.
+- **Shortlisting:** each item's results from both apps are scored on relevance (35%), your past picks and liked brands (25%), premium signal (20%), rating × number of reviews (15%) and discount (5%). Wrong products ("atta noodles") and out-of-stock items are dropped. The same product sold on both apps is merged into one card. You see the top 3 per item.
+- **Comparison:** apps are ranked by all items available, then fewest substitutions, then lowest **you pay** (total minus wallet), then total, then delivery time. If the wallet is short, the page suggests which iShop voucher to buy.
+- **Memory:** after you pick the same product twice, it's picked for you. Liked brands rank first; avoided brands never appear.
+- **Vouchers:** you buy them on iShop. A "redeem" task has Claude in Chrome find the code in your Gmail and redeem it on the site. Only the last 4 characters come back to the page.
 
 ## Setup (once)
 
-1. Install the **Claude desktop app** and open this repo in Claude Code there (Node 20+ required; no npm packages).
-2. In the app's **built-in browser**, log in to blinkit.com, bigbasket.com and Gmail. The sign-ins persist.
-3. Connect the **Gmail** connector in Claude (Settings → Connectors) so the agent can read voucher emails.
-4. Edit `prefs.json`: your delivery pincode. Optionally add voucher discount % and premium brands.
-5. Start the UI: `npm run ui` → open http://localhost:4317 in the browser pane.
+1. Install **Claude in Chrome** from the Chrome Web Store and sign in.
+2. In Chrome, log in to blinkit.com, bigbasket.com and Gmail.
+3. Open the **Grocery Concierge** page: https://claude.ai/artifact/T1KPhKczobAugKBriRtaDd
 
-## Use
+## First pilot run
 
-- In the UI: queue "Add vouchers to wallets" or "Buy items", then tell Claude **"process my intents"** (or `/shop`).
-- Or straight from chat: `/shop milk 1L x2, eggs 12, atta 5kg` · `/shop redeem` · `/shop balances`.
-- Teach it: "I like Akshayakalpa milk", "never Fortune". It saves these with `node tools/shop.js like|dislike|note`.
+- [ ] **Balances:** "Copy balance check" → paste into Claude in Chrome → paste its reply into the page. Both balances should match the apps.
+- [ ] **Voucher:** buy a small iShop voucher for each app → "Add vouchers to wallets" → copy the redeem task → paste the reply. Balances go up by the voucher value.
+- [ ] **Order:** "Milk, eggs, atta 5kg" → search task → paste reply → pick → approve → cart task → paste reply → place the order on the site → "I placed the order".
+- [ ] Repeat the same list twice more: your picks become automatic.
+- [ ] Note anything Claude in Chrome got wrong in `stores/*.md` so the prompts can be tightened.
 
-## First pilot run (checklist)
-
-- [ ] `/shop balances`: both wallet balances match the apps. Fill in the **Wallet balance** sections of `stores/*.md`.
-- [ ] Buy a small iShop voucher for each app → `/shop redeem`: both redeemed, balances up by the voucher value. Fill in `stores/ishop-email.md` (sender, subject).
-- [ ] Re-run `/shop redeem`: nothing gets redeemed twice.
-- [ ] `/shop milk, eggs, atta 5kg`: shortlist appears in the UI → pick → comparison → approve → cart built → agent stops at checkout → you place the order → click "I placed the order".
-- [ ] Repeat the same list twice more: picks become automatic.
-
-## Files
+## Developing
 
 | Path | What |
 |---|---|
-| `CLAUDE.md` | Your preferences and the hard rules (never pay, never buy vouchers, mask codes) |
-| `.claude/skills/shop/SKILL.md` | The orchestrator procedure |
-| `.claude/agents/*.md` | Sub-agents |
-| `stores/*.md` | Per-site playbooks (landmarks, not selectors). Update on first run. |
-| `tools/shop.js` | The agent's CLI for state, shortlisting, comparing and memory (`node tools/shop.js help`) |
-| `lib/` | Scoring (`shortlist.js`), app ranking (`compare.js`), memory, size parsing |
-| `ui/` | Local intent UI (`server.js` binds 127.0.0.1 only and never serves full voucher codes) |
-| `test/` | `npm test`: unit tests plus a full simulated flow |
+| `lib/` | Scoring (`shortlist.js`), app ranking (`compare.js`), taste memory (`taste.js`), reply parsing and request flow (`flow.js`), Claude in Chrome task prompts (`prompts.js`) |
+| `web/concierge.src.html` | The page |
+| `build.js` | Bundles `lib/` + `prefs.json` into `dist/concierge.html` |
+| `prefs.json` | Pincode, fee estimates, voucher denominations/discounts, premium brands |
+| `stores/*.md` | Notes on each site and the iShop emails, filled in from real runs |
+| `.claude/skills/shop` | `/shop` in Claude Code on the web: status, likes/dislikes, check Gmail for new vouchers |
+
+```bash
+npm test
+```
+
+```bash
+node build.js
+```
+
+Then republish `dist/concierge.html` to the page URL above (ask Claude Code on the web to do this).
 
 ## Safety
 
-- The agent never clicks pay or place order, and never buys vouchers.
-- Voucher codes live only in `state/vouchers.json` (gitignored), are masked everywhere else, and are deduplicated so a code is never redeemed twice.
-- Text from shopping sites and emails is treated as data, never as instructions.
+- No step ever pays, places an order or buys a voucher. Every Chrome task says so explicitly.
+- Full voucher codes never reach the page. Only the last 4 characters are kept.
+- The page's data is readable and writable only by you, even if you share the link.

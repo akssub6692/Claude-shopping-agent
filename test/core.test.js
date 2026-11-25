@@ -1,23 +1,17 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'shop-test-'));
-process.env.SHOP_STATE_DIR = path.join(tmp, 'state');
-process.env.SHOP_MEMORY_DIR = path.join(tmp, 'memory');
 
 const { parseSize, unitPrice } = require('../lib/units');
-const { parseItem, sameProduct, itemKey } = require('../lib/text');
+const { parseItem, sameProduct, itemKey, parseItemList } = require('../lib/text');
 const { shortlistItem } = require('../lib/shortlist');
 const { compareApps, suggestVoucher } = require('../lib/compare');
-const store = require('../lib/store');
-const memory = require('../lib/memory');
+const taste = require('../lib/taste');
+const flow = require('../lib/flow');
+const prompts = require('../lib/prompts');
 const prefs = require('../prefs.json');
 
-const reset = () => fs.rmSync(tmp, { recursive: true, force: true });
+const ctx0 = () => ({ profile: taste.emptyProfile(), history: [] });
 
 test('sizes and unit prices', () => {
   assert.deepEqual(parseSize('5 kg'), { qty: 5000, base: 'g' });
@@ -30,12 +24,13 @@ test('sizes and unit prices', () => {
 });
 
 test('item parsing keeps pack sizes and reads explicit counts', () => {
-  assert.deepEqual(parseItem('Milk 1L x2').count, 2);
+  assert.equal(parseItem('Milk 1L x2').count, 2);
   assert.equal(parseItem('Milk 1L x2').text, 'Milk 1L');
   assert.equal(parseItem('2 x Amul butter 500g').count, 2);
   assert.equal(parseItem('12 eggs').count, 1);
   assert.deepEqual(parseItem('12 eggs').size, { qty: 12, base: 'pc' });
   assert.equal(itemKey('Atta 5kg'), itemKey('atta'));
+  assert.deepEqual(parseItemList('milk\n\n eggs ;atta').map((i) => i.id), ['i1', 'i2', 'i3']);
 });
 
 test('same product is matched across apps despite different titles', () => {
@@ -48,7 +43,7 @@ test('same product is matched across apps despite different titles', () => {
 const ATTA = {
   blinkit: [
     { name: 'Aashirvaad Shudh Chakki Atta', brand: 'Aashirvaad', size: '5 kg', price: 285, mrp: 310, sponsored: true, url: 'https://blinkit.com/prn/a' },
-    { name: 'Pro Nature Organic Whole Wheat Atta', brand: 'Pro Nature', size: '5 kg', price: 420, mrp: 450, url: 'https://blinkit.com/prn/b' },
+    { name: 'Pro Nature Organic Whole Wheat Atta', brand: 'Pro Nature', size: '5 kg', price: 420, mrp: 450 },
     { name: 'Fortune Chakki Fresh Atta', brand: 'Fortune', size: '5 kg', price: 260, mrp: 280 },
     { name: 'Maggi Atta Noodles', brand: 'Maggi', size: '290 g', price: 70, relevant: false },
     { name: 'Aashirvaad Select Sharbati Atta', brand: 'Aashirvaad', size: '5 kg', price: 380, inStock: false },
@@ -60,9 +55,7 @@ const ATTA = {
 };
 
 test('shortlist: filters noise, merges apps, prefers premium, asks on first run', () => {
-  reset();
-  const ctx = memory.buildContext();
-  const s = shortlistItem({ id: 'i1', text: 'Atta 5kg' }, ATTA, ctx, prefs);
+  const s = shortlistItem({ id: 'i1', text: 'Atta 5kg' }, ATTA, ctx0(), prefs);
   assert.equal(s.options.length, 3);
   assert.equal(s.dropped.irrelevant, 1);
   assert.equal(s.dropped.outOfStock, 1);
@@ -72,75 +65,91 @@ test('shortlist: filters noise, merges apps, prefers premium, asks on first run'
   assert.equal(s.autoPick, null);
 });
 
-test('disliked brands never appear', () => {
-  reset();
-  memory.setPreference('dislikes', 'Fortune');
-  const s = shortlistItem({ id: 'i1', text: 'atta 5kg' }, ATTA, memory.buildContext(), prefs);
+test('liked brands are auto-picked; avoided brands never appear', () => {
+  let p = taste.withPreference(taste.emptyProfile(), 'dislikes', 'Fortune');
+  p = taste.withPreference(p, 'likes', 'Aashirvaad', 'atta');
+  const s = shortlistItem({ id: 'i1', text: 'atta 5kg' }, ATTA, { profile: p, history: [] }, prefs);
   assert.ok(!s.allOptions.some((o) => o.brand === 'Fortune'));
-  assert.equal(s.dropped.disliked, 1);
+  assert.equal(s.options[0].brand, 'Aashirvaad');
+  assert.equal(s.autoPick, s.options[0].id);
+  // liking it again doesn't duplicate; flipping to avoid removes the like
+  assert.equal(taste.withPreference(p, 'likes', 'aashirvaad', 'Atta').likes.length, 1);
+  assert.equal(taste.withPreference(p, 'dislikes', 'Aashirvaad', 'atta').likes.length, 0);
 });
 
 test('compare ranks by availability then out-of-pocket and suggests a voucher', () => {
-  const intent = {
+  const request = {
     picks: { i1: 'i1o1' }, budget: null, preferredApp: null,
     shortlist: { items: [{ id: 'i1', text: 'atta', count: 2, options: [], bestByApp: { blinkit: 'i1o1', bigbasket: 'i1o1' },
       allOptions: [{ id: 'i1o1', brand: 'A', name: 'A atta', sizeText: '5 kg', apps: { blinkit: { price: 285 }, bigbasket: { price: 279 } } }] }] },
   };
-  const cmp = compareApps(intent, ['blinkit', 'bigbasket'], { blinkit: { balance: 600 }, bigbasket: { balance: 0 } }, prefs);
+  const cmp = compareApps(request, ['blinkit', 'bigbasket'], { blinkit: { balance: 600 }, bigbasket: { balance: 0 } }, prefs);
   assert.equal(cmp.recommended, 'blinkit');
   const b = cmp.apps.find((a) => a.app === 'blinkit');
   assert.equal(b.total, 579); assert.equal(b.payable, 0);
-  const cmp2 = compareApps(intent, ['blinkit', 'bigbasket'], { blinkit: { balance: 100 }, bigbasket: { balance: 0 } }, prefs);
+  const cmp2 = compareApps(request, ['blinkit', 'bigbasket'], { blinkit: { balance: 100 }, bigbasket: { balance: 0 } }, prefs);
   assert.equal(cmp2.voucher.total, 500);
   assert.deepEqual(suggestVoucher('blinkit', 2600, prefs).buy, [2000, 1000]);
 });
 
-test('vouchers are deduplicated and masked', () => {
-  reset();
-  assert.equal(store.addVoucher({ app: 'blinkit', code: 'ABCD-1234-WXYZ', value: 500 }).added, true);
-  assert.equal(store.addVoucher({ app: 'blinkit', code: 'abcd1234wxyz', value: 500 }).added, false);
-  const pub = store.listVouchers().map(store.publicVoucher);
-  assert.equal(pub[0].code, '••••WXYZ');
-  assert.ok(!JSON.stringify(pub).includes('ABCD'));
+test('replies: JSON is pulled out of chatter and classified', () => {
+  const reply = 'Here you go!\n```json\n{"wallets":{"Blinkit":"₹1,250","BB":0}}\n```\nAnything else?';
+  const obj = flow.extractJson(reply);
+  assert.equal(flow.classifyReply(obj), 'wallets');
+  assert.deepEqual(flow.walletsFrom(obj), { blinkit: 1250, bigbasket: 0 });
+  assert.throws(() => flow.extractJson('no json here'), /No JSON/);
+  assert.equal(flow.classifyReply({ subtotal: 1 }), 'cart');
+  assert.equal(flow.classifyReply({ vouchers: [] }), 'redeem');
 });
 
-test('end to end: queue → shortlist → pick → compare → approve → cart → memory auto-picks next time', () => {
-  reset();
-  const { execFileSync } = require('child_process');
-  const cli = (...a) => execFileSync(process.execPath, [path.join(__dirname, '..', 'tools', 'shop.js'), ...a], { env: process.env, encoding: 'utf8' });
-  const run = (items) => {
-    const id = cli('new-purchase', '--items', items).split(/\s+/)[0];
-    const dir = store.files.runDir(id);
-    fs.mkdirSync(dir, { recursive: true });
-    for (const app of ['blinkit', 'bigbasket']) {
-      store.writeJSON(path.join(dir, `search-${app}.json`), { app, etaMins: app === 'blinkit' ? 10 : 25, items: [{ item: 'i1', query: 'atta', results: ATTA[app] }] });
-    }
-    cli('shortlist', id);
-    return id;
+test('redeem replies never keep full codes', () => {
+  const { vouchers, wallets } = flow.redeemFrom({ vouchers: [{ app: 'Blinkit', value: '500', code: 'ABCD-1234-WXYZ', status: 'redeemed' }], wallets: { blinkit: 900 } });
+  assert.equal(vouchers[0].last4, 'WXYZ');
+  assert.ok(!JSON.stringify(vouchers).includes('ABCD'));
+  assert.equal(wallets.blinkit, 900);
+  assert.equal(flow.voucherId(vouchers[0]), 'blinkit-WXYZ-500');
+});
+
+test('prompts carry the request, the taste and the never-pay rule', () => {
+  const r = { id: 'R1ABC', items: parseItemList('milk 1L x2\natta 5kg') };
+  const p = prompts.searchPrompt(r, taste.withPreference(taste.emptyProfile(), 'likes', 'Akshayakalpa', 'milk'), '560001');
+  assert.match(p, /R1ABC/); assert.match(p, /i2: atta 5kg/); assert.match(p, /Akshayakalpa/); assert.match(p, /Never click Pay/); assert.match(p, /560001/);
+  assert.match(prompts.redeemPrompt([{ app: 'blinkit', last4: 'WXYZ', value: 500 }], ['blinkit']), /••••WXYZ/);
+});
+
+test('end to end: search reply → shortlist → picks → compare → cart reply → memory auto-picks next time', () => {
+  const history = [];
+  const runOnce = (text, wallets) => {
+    const r = { id: 'RX', items: parseItemList(text), picks: {}, results: {} };
+    const reply = '```json\n' + JSON.stringify({ request: 'RX', sites: [
+      { app: 'blinkit', available: true, etaMins: 10, wallet: wallets.blinkit, items: [{ item: 'i1', query: 'atta', results: ATTA.blinkit }] },
+      { app: 'bigbasket', available: true, etaMins: 25, wallet: wallets.bigbasket, items: [{ item: 'i1', query: 'atta', results: ATTA.bigbasket }] }] }) + '\n```';
+    const obj = flow.extractJson(reply);
+    assert.equal(flow.classifyReply(obj), 'search');
+    const { results, wallets: w } = flow.searchFrom(obj, r);
+    r.results = results;
+    Object.assign(r, flow.runShortlist(r, { profile: taste.emptyProfile(), history }, prefs));
+    return { r, w };
   };
-  cli('wallet', 'blinkit', '700');
-  const id = run('Atta 5kg');
-  let it = store.getIntent(id);
-  assert.equal(it.status, 'needs_pick');
-  const aash = it.shortlist.items[0].allOptions.find((o) => o.brand === 'Aashirvaad');
-  store.updateIntent(id, { picks: { i1: aash.id }, status: 'ready_to_compare' });
-  cli('compare', id);
-  it = store.getIntent(id);
-  assert.equal(it.status, 'needs_approval');
-  assert.equal(it.comparison.recommended, 'blinkit');
-  store.updateIntent(id, { status: 'approved', approval: { app: 'blinkit' } });
-  cli('cart', id, '--app', 'blinkit', '--json', '{"subtotal":285,"fees":{"handling":9},"total":294,"walletApplied":294,"payable":0}');
-  assert.equal(store.getIntent(id).status, 'cart_ready');
-  cli('record', id);
-  cli('record', id); // idempotent
-  assert.equal(memory.loadHistory().length, 1);
-  // Second time: picked once → not yet auto. Third time: picked twice → auto-picked.
-  const id2 = run('atta');
-  assert.equal(store.getIntent(id2).status, 'needs_pick');
-  store.updateIntent(id2, { picks: { i1: store.getIntent(id2).shortlist.items[0].allOptions.find((o) => o.brand === 'Aashirvaad').id }, memoryRecorded: false });
-  cli('record', id2);
-  const id3 = run('atta 5 kg');
-  const it3 = store.getIntent(id3);
-  assert.equal(it3.status, 'ready_to_compare');
-  assert.equal(it3.shortlist.items[0].options[0].brand, 'Aashirvaad');
+  const { r, w } = runOnce('Atta 5kg', { blinkit: 700, bigbasket: 0 });
+  assert.equal(flow.openItems(r).length, 1);
+  const aash = r.shortlist.items[0].allOptions.find((o) => o.brand === 'Aashirvaad');
+  r.picks.i1 = aash.id;
+  assert.equal(flow.openItems(r).length, 0);
+  const wallets = Object.fromEntries(Object.entries(w).map(([a, b]) => [a, { balance: b }]));
+  r.comparison = flow.runCompare(r, wallets, prefs);
+  assert.equal(r.comparison.recommended, 'blinkit');
+  r.approval = { app: 'blinkit' };
+  const cart = flow.cartFrom(flow.extractJson('{"app":"Blinkit","subtotal":285,"fees":{"handling":"₹9"},"total":294,"walletApplied":294,"payable":0}'));
+  assert.deepEqual(cart.fees, { handling: 9 });
+  history.push(...taste.pickRecords(r, 't1'));
+  assert.equal(history.length, 1);
+  // Picked once: still asks. Picked twice: auto-picked.
+  const second = runOnce('atta', { blinkit: 0, bigbasket: 0 }).r;
+  assert.equal(flow.openItems(second).length, 1);
+  second.picks.i1 = second.shortlist.items[0].allOptions.find((o) => o.brand === 'Aashirvaad').id;
+  history.push(...taste.pickRecords(second, 't2'));
+  const third = runOnce('atta 5 kg', { blinkit: 0, bigbasket: 0 }).r;
+  assert.equal(flow.openItems(third).length, 0);
+  assert.equal(third.shortlist.items[0].options[0].brand, 'Aashirvaad');
 });

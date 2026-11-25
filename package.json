@@ -5,7 +5,7 @@
   "description": "Claude-powered shopping agent: voucher redemption, product shortlisting and cross-app comparison",
   "scripts": {
     "ui": "node ui/server.js",
-    "shop": "node tools/shop.js",
+    "build": "node build.js",
     "test": "node --test test/*.test.js"
   },
   "engines": { "node": ">=20" },

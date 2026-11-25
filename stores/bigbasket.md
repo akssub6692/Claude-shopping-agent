@@ -1,12 +1,13 @@
 # BigBasket
 
 - **Site:** https://www.bigbasket.com (BB Now = 10–30 min quick delivery; scheduled delivery = slot-based)
-- **Last verified:** not yet. Verify each section on the first pilot run and fill in what you see.
+- **Last verified:** not yet. Fill in what Claude in Chrome actually finds on the first pilot run.
+- **Used by:** Claude in Chrome, through the tasks the Grocery Concierge page copies (`lib/prompts.js`).
 
 ## Login check
-- Header shows the account name/icon when logged in, **Login/Sign Up** when not. If logged out, stop: the user logs in with phone + OTP in the browser pane.
+- Header shows the account name/icon when logged in, **Login/Sign Up** when not. If logged out, stop: I log in with phone + OTP in Chrome.
 - Delivery location is in the header. Check it matches `prefs.json → delivery`.
-- Prefer **BB Now** (quick delivery) when the toggle exists; note in the search file whether results are BB Now or scheduled. Put the BB Now ETA in `etaMins`; for slot delivery set `etaMins` to minutes until the earliest slot.
+- Prefer **BB Now** (quick delivery) when the toggle exists; Put the BB Now ETA in `etaMins`; for slot delivery set `etaMins` to minutes until the earliest slot.
 
 ## Search
 - Search box in the header; results URL looks like `https://www.bigbasket.com/ps/?q=<query>`.

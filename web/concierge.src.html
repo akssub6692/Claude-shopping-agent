@@ -1,0 +1,453 @@
+<title>Grocery Concierge</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: one working column; wallets and the paste box up top, requests as a queue of step cards below. */
+:root {
+  --bg: #f3f5f1; --surface: #fcfdfb; --sunk: #e8ece5; --ink: #142019; --muted: #5d6b62; --line: #d9dfd5;
+  --accent: #12704a; --accent-ink: #ffffff; --accent-soft: #dcece3; --saffron: #b9790f; --saffron-soft: #f6ead2;
+  --alert: #a3401c; --alert-soft: #f6e1d7;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: Inter, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --shadow: 0 1px 2px rgba(20,32,25,.05), 0 6px 20px rgba(20,32,25,.06);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1512; --surface: #161e1a; --sunk: #1d2722; --ink: #e9efe9; --muted: #98a69d; --line: #29352e;
+  --accent: #5cc796; --accent-ink: #08140e; --accent-soft: #1b3127; --saffron: #e6b04f; --saffron-soft: #33291a;
+  --alert: #f09a74; --alert-soft: #35221a; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1512; --surface: #161e1a; --sunk: #1d2722; --ink: #e9efe9; --muted: #98a69d; --line: #29352e;
+  --accent: #5cc796; --accent-ink: #08140e; --accent-soft: #1b3127; --saffron: #e6b04f; --saffron-soft: #33291a;
+  --alert: #f09a74; --alert-soft: #35221a; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25); color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 920px; margin: 0 auto; padding-block: 28px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 22px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 650; letter-spacing: -.015em; margin: 0; text-wrap: balance; }
+h1 { font-size: 30px; line-height: 1.1; }
+h2 { font-size: 19px; }
+h3 { font-size: 16px; font-weight: 500; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 6px 16px; }
+.wallets { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.tile .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.tile .num { font: 650 26px/1.2 var(--display); font-variant-numeric: tabular-nums; margin-top: 4px; }
+.tile .delta { font: 500 13px var(--body); color: var(--accent); margin-left: 6px; }
+.tile.action { display: grid; align-content: center; gap: 8px; background: transparent; border-style: dashed; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: var(--shadow); min-width: 0; }
+.paste { border: 1.5px solid var(--accent); }
+.paste-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; align-items: baseline; margin-bottom: 10px; }
+label { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+textarea, input, select { width: 100%; font: 15px/1.5 var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+textarea:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+textarea { min-height: 110px; resize: vertical; }
+#pasteBox { min-height: 76px; font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 9px 18px; font: 500 14px var(--body); cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.quiet { background: transparent; border-color: transparent; color: var(--muted); padding-inline: 8px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.msg { font-size: 13px; color: var(--muted); }
+.msg.ok { color: var(--accent); } .msg.err { color: var(--alert); }
+.tabs { display: inline-flex; background: var(--sunk); border-radius: 999px; padding: 3px; margin-bottom: 16px; }
+.tabs button { border: 0; background: transparent; color: var(--muted); padding: 7px 16px; border-radius: 999px; font: 500 14px var(--body); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; gap: 6px; align-items: center; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13px; background: var(--bg); text-transform: none; letter-spacing: 0; color: var(--ink); margin: 0; }
+.chip input { width: auto; margin: 0; accent-color: var(--accent); }
+.chip button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 2px; font-size: 15px; line-height: 1; }
+.chip.like { border-color: var(--accent); }
+.chip.avoid { border-color: var(--alert); color: var(--alert); }
+.req-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.req-title { font: 500 17px/1.35 var(--display); }
+.pill { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.pill.you { background: var(--saffron-soft); color: var(--saffron); }
+.pill.ok { background: var(--accent-soft); color: var(--accent); }
+.step { margin-top: 14px; padding: 12px 14px; background: var(--sunk); border-radius: 12px; font-size: 14px; }
+.step ol { margin: 6px 0 0; padding-left: 20px; }
+.item { margin-top: 16px; }
+.item-name { font-weight: 600; margin-bottom: 8px; }
+.item-name small { color: var(--muted); font-weight: 400; }
+.options { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.opt { text-align: left; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px; background: var(--bg); cursor: pointer; color: var(--ink); font: inherit; display: grid; gap: 2px; align-content: start; }
+.opt:hover { border-color: var(--muted); }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.opt .b { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--saffron); }
+.opt .n { font-size: 14px; line-height: 1.3; }
+.opt .p { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.opt .p strong { color: var(--ink); font-weight: 600; }
+.tag { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 6px; background: var(--alert-soft); color: var(--alert); margin-left: 4px; }
+.tbl { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; margin-top: 12px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 9px 7px; border-bottom: 1px solid var(--line); font-size: 14px; }
+th:first-child, td:first-child { text-align: left; }
+th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+tr.rec td { font-weight: 600; }
+.rec-tag { display: inline-block; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 500; margin-left: 6px; }
+.note { margin-top: 12px; font-size: 14px; padding: 10px 12px; border-radius: 10px; background: var(--saffron-soft); }
+.bill { list-style: none; margin: 12px 0 0; padding: 0; max-width: 360px; font-variant-numeric: tabular-nums; }
+.bill li { display: flex; justify-content: space-between; padding: 3px 0; color: var(--muted); font-size: 14px; }
+.bill li.total { color: var(--ink); font-weight: 600; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 6px; }
+.prompt-text { margin-top: 10px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; min-height: 160px; }
+.empty { text-align: center; padding: 28px; border: 1px dashed var(--line); border-radius: 18px; color: var(--muted); }
+.status-line { font-size: 13px; color: var(--muted); }
+details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; }
+@media (prefers-reduced-motion: no-preference) { .btn, .opt { transition: border-color .15s, background-color .15s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div><h1>Grocery Concierge</h1><div class="muted small">Blinkit · BigBasket · Claude in Chrome does the browsing, you place the order</div></div>
+    <div class="status-line" id="memo">Connecting…</div>
+  </header>
+
+  <section class="wallets" id="wallets" aria-label="Wallet balances"></section>
+
+  <section class="card paste" aria-labelledby="pasteTitle">
+    <div class="paste-head"><h2 id="pasteTitle">Paste a reply from Claude in Chrome</h2><span class="muted small">Search results, cart bill, vouchers or balances: the page works out which</span></div>
+    <textarea id="pasteBox" placeholder='Paste the whole reply here, including the { … } JSON block'></textarea>
+    <div class="row"><button class="btn primary" id="pasteSave" type="button">Save reply</button><span class="msg" id="pasteMsg" role="status"></span></div>
+  </section>
+
+  <section class="card" aria-labelledby="newTitle">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tabBuy" aria-selected="true" type="button">Buy groceries</button>
+      <button role="tab" id="tabRedeem" aria-selected="false" type="button">Add vouchers to wallets</button>
+    </div>
+    <form id="buyForm" aria-labelledby="tabBuy">
+      <h2 id="newTitle" hidden>New request</h2>
+      <label for="items">Items, one per line</label>
+      <textarea id="items" placeholder="Milk 1L x2&#10;Brown eggs 12&#10;Atta 5kg&#10;Greek yogurt" required></textarea>
+      <div class="grid3">
+        <div><label for="prefApp">Preferred app</label><select id="prefApp"><option value="">Best value</option><option value="blinkit">Blinkit</option><option value="bigbasket">BigBasket</option></select></div>
+        <div><label for="budget">Budget in ₹ (optional)</label><input id="budget" type="number" min="0" step="1" inputmode="numeric"></div>
+      </div>
+      <div class="row"><button class="btn primary" type="submit">Create request</button><span class="msg" id="buyMsg" role="status"></span></div>
+    </form>
+    <form id="redeemForm" hidden aria-labelledby="tabRedeem">
+      <p class="muted" style="margin:0 0 12px">Buy the voucher on iShop first. Claude in Chrome finds the code in your Gmail, redeems it on the site and reports back only the last 4 characters.</p>
+      <label>Apps</label>
+      <div class="chips"><label class="chip"><input type="checkbox" id="rdBlinkit" value="blinkit" checked> Blinkit</label><label class="chip"><input type="checkbox" id="rdBigbasket" value="bigbasket" checked> BigBasket</label></div>
+      <div class="row"><button class="btn primary" type="submit">Create redeem task</button><span class="msg" id="redeemMsg" role="status"></span></div>
+    </form>
+  </section>
+
+  <section aria-labelledby="reqTitle">
+    <div class="paste-head"><h2 id="reqTitle">Requests</h2><span class="muted small">Newest first</span></div>
+    <div id="requests" style="display:grid;gap:14px"><div class="empty">Loading your requests…</div></div>
+  </section>
+
+  <section class="two">
+    <div class="card" aria-labelledby="tasteTitle">
+      <h2 id="tasteTitle">Your taste</h2>
+      <p class="muted small" style="margin:6px 0 12px">Liked brands rank first and get picked for you. Avoided brands never show. After you pick the same product twice, it's picked automatically.</p>
+      <div class="chips" id="tasteChips"></div>
+      <div class="grid3">
+        <div><label for="tasteBrand">Brand</label><input id="tasteBrand" placeholder="Akshayakalpa"></div>
+        <div><label for="tasteItem">For item (optional)</label><input id="tasteItem" placeholder="milk"></div>
+      </div>
+      <div class="row"><button class="btn" id="likeBtn" type="button">Like</button><button class="btn" id="avoidBtn" type="button">Avoid</button><span class="msg" id="tasteMsg" role="status"></span></div>
+    </div>
+    <div class="card" aria-labelledby="vTitle">
+      <h2 id="vTitle">Vouchers</h2>
+      <div id="vouchers"><p class="muted small">Redeemed vouchers show here with only their last 4 characters.</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+/*@BUNDLE@*/
+</script>
+<script>
+'use strict';
+const PREFS = /*@PREFS@*/;
+const L = window.ShopLib;
+const APP_NAME = { blinkit: 'Blinkit', bigbasket: 'BigBasket' };
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const inr = (n) => (n == null ? '–' : '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 }));
+const appName = (a) => APP_NAME[a] || a;
+const nowIso = () => new Date().toISOString();
+const ago = (iso) => { if (!iso) return ''; const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
+const newId = () => 'R' + Date.now().toString(36).slice(-5).toUpperCase();
+
+const S = { requests: [], wallets: {}, vouchers: [], history: [], profile: L.taste.emptyProfile(), ready: false, readOnly: false };
+const pending = {}; // requestId -> { itemId: optionId } chosen but not saved
+let db = null;
+
+const STATUS = {
+  searching: ['Search', 'you'], needs_pick: ['Your pick', 'you'], needs_approval: ['Approve', 'you'], approved: ['Fill cart', 'you'],
+  cart_ready: ['Place order', 'you'], done: ['Done', 'ok'], cancelled: ['Cancelled', ''], redeeming: ['Redeem', 'you'],
+};
+
+function setMsg(id, text, tone) { const el = $(id); el.textContent = text; el.className = 'msg' + (tone ? ' ' + tone : ''); }
+
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied: paste it into Claude in Chrome'; setTimeout(() => { btn.textContent = btn.dataset.label; }, 4000); return true; }
+  catch { const box = btn.closest('.req, .tile')?.querySelector('.prompt-text'); if (box) { box.hidden = false; box.focus(); box.select(); } btn.textContent = 'Select the text below and copy it'; return false; }
+}
+
+// ---------- data ----------
+const reqRef = (id) => db.doc('requests/' + id);
+async function saveRequest(r) { await reqRef(r.id).set(JSON.parse(JSON.stringify(r))); }
+async function setWallets(map) {
+  for (const [app, bal] of Object.entries(map)) {
+    const prev = S.wallets[app] ? S.wallets[app].balance : null;
+    await db.doc('wallets/' + app).set({ balance: bal, previous: prev, checkedAt: nowIso() });
+  }
+}
+const ctx = () => ({ profile: S.profile, history: S.history });
+
+function afterPicks(r) {
+  const open = L.flow.openItems(r);
+  if (open.length) { r.status = 'needs_pick'; r.stage = `Pick ${open.length} item${open.length > 1 ? 's' : ''} below`; return r; }
+  r.comparison = L.flow.runCompare(r, S.wallets, PREFS);
+  const rec = r.comparison.apps.find((a) => a.app === r.comparison.recommended);
+  r.status = 'needs_approval';
+  r.stage = rec ? `${appName(rec.app)} looks best: you pay ${inr(rec.payable)} after wallet` : 'Neither app has these items';
+  return r;
+}
+
+async function handlePaste() {
+  const text = $('#pasteBox').value;
+  if (!text.trim()) { setMsg('#pasteMsg', 'Paste a reply first.', 'err'); return; }
+  let obj, kind;
+  try { obj = L.flow.extractJson(text); kind = L.flow.classifyReply(obj); } catch (e) { setMsg('#pasteMsg', e.message, 'err'); return; }
+  const pick = (status) => {
+    const byId = obj.request && S.requests.find((r) => r.id === String(obj.request).toUpperCase());
+    if (byId) return byId;
+    const c = S.requests.filter((r) => r.status === status);
+    return c.length === 1 ? c[0] : null;
+  };
+  try {
+    if (kind === 'wallets') {
+      const w = L.flow.walletsFrom(obj); await setWallets(w);
+      setMsg('#pasteMsg', `Balances saved: ${Object.entries(w).map(([a, b]) => `${appName(a)} ${inr(b)}`).join(' · ')}`, 'ok');
+    } else if (kind === 'search') {
+      const r0 = pick('searching');
+      if (!r0) throw new Error('Couldn\'t tell which request these results are for. Make sure the reply includes "request".');
+      const { results, wallets } = L.flow.searchFrom(obj, r0);
+      if (Object.keys(wallets).length) await setWallets(wallets);
+      const r = structuredClone(r0);
+      r.results = { ...(r.results || {}), ...results };
+      const have = Object.keys(r.results);
+      const waiting = L.flow.APPS.filter((a) => !have.includes(a));
+      if (waiting.length) {
+        r.stage = `Got ${have.map(appName).join(', ')}. Still waiting for ${waiting.map(appName).join(', ')} results.`;
+      } else {
+        Object.assign(r, L.flow.runShortlist(r, ctx(), PREFS));
+        afterPicks(r);
+      }
+      await saveRequest(r);
+      setMsg('#pasteMsg', `Results saved for ${r.id}. ${r.stage}`, 'ok');
+    } else if (kind === 'cart') {
+      const r0 = pick('approved');
+      if (!r0) throw new Error('No request is waiting for a cart. Approve an app first.');
+      const r = structuredClone(r0);
+      r.cart = { ...L.flow.cartFrom(obj), at: nowIso() };
+      r.status = 'cart_ready';
+      r.stage = `Cart ready on ${appName(r.cart.app || r.approval.app)}. Place the order in the site, then tap "I placed the order".`;
+      if (!r.memoryRecorded) {
+        const recs = L.taste.pickRecords(r, nowIso());
+        for (const h of recs) await db.collection('history').add(h);
+        r.memoryRecorded = true;
+      }
+      await saveRequest(r);
+      setMsg('#pasteMsg', `Cart saved: you pay ${inr(r.cart.payable ?? r.cart.total)}.`, 'ok');
+    } else if (kind === 'redeem') {
+      const { vouchers, wallets } = L.flow.redeemFrom(obj);
+      for (const v of vouchers) await db.doc('vouchers/' + L.flow.voucherId(v)).set({ ...v, at: nowIso() });
+      if (Object.keys(wallets).length) await setWallets(wallets);
+      const added = vouchers.filter((v) => v.status === 'redeemed');
+      const summary = vouchers.length ? `${added.length} redeemed${added.length ? ` (${added.map((v) => `${appName(v.app)} ${inr(v.value)}`).join(', ')})` : ''}${vouchers.length > added.length ? `, ${vouchers.length - added.length} failed` : ''}` : 'No new vouchers found';
+      const r0 = S.requests.find((r) => r.status === 'redeeming');
+      if (r0) await saveRequest({ ...structuredClone(r0), status: 'done', stage: summary, doneAt: nowIso() });
+      setMsg('#pasteMsg', summary + '.', 'ok');
+    }
+    $('#pasteBox').value = '';
+  } catch (e) { setMsg('#pasteMsg', e.message || 'Couldn\'t save that reply.', 'err'); }
+}
+
+// ---------- render ----------
+function renderWallets() {
+  const tiles = L.flow.APPS.map((a) => {
+    const w = S.wallets[a];
+    const delta = w && w.previous != null && w.balance > w.previous ? `<span class="delta">+${inr(w.balance - w.previous)}</span>` : '';
+    return `<div class="tile"><div class="label">${esc(appName(a))} wallet</div><div class="num">${w ? inr(w.balance) : '—'}${delta}</div><div class="muted small">${w ? 'Checked ' + esc(ago(w.checkedAt)) : 'Not checked yet'}</div></div>`;
+  }).join('');
+  $('#wallets').innerHTML = tiles + `<div class="tile action"><button class="btn" type="button" data-act="copy-wallets" data-label="Copy balance check">Copy balance check</button><span class="muted small">Paste it into Claude in Chrome, then paste its reply above.</span><textarea class="prompt-text" hidden readonly>${esc(L.prompts.walletPrompt())}</textarea></div>`;
+}
+
+function renderTaste() {
+  const p = S.profile;
+  const chip = (e, kind) => `<span class="chip ${kind === 'likes' ? 'like' : 'avoid'}">${kind === 'likes' ? '♥' : '✕'} ${esc(e.brand)}${e.item ? ` · ${esc(e.item)}` : ''}<button type="button" aria-label="Remove ${esc(e.brand)}" data-act="untaste" data-kind="${kind}" data-brand="${esc(e.brand)}" data-item="${esc(e.item || '')}">×</button></span>`;
+  const all = (p.likes || []).map((e) => chip(e, 'likes')).concat((p.dislikes || []).map((e) => chip(e, 'dislikes')));
+  $('#tasteChips').innerHTML = all.length ? all.join('') : '<span class="muted small">No brands yet.</span>';
+  $('#memo').textContent = `Remembering ${S.history.length} pick${S.history.length === 1 ? '' : 's'} · ${(p.likes || []).length} liked brand${(p.likes || []).length === 1 ? '' : 's'}`;
+}
+
+function renderVouchers() {
+  if (!S.vouchers.length) return;
+  $('#vouchers').innerHTML = `<div class="tbl"><table><thead><tr><th>App</th><th>Code</th><th>Value</th><th>Status</th></tr></thead><tbody>${
+    S.vouchers.slice().sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 12).map((v) => `<tr><td>${esc(appName(v.app))}</td><td>••••${esc(v.last4)}</td><td>${inr(v.value)}</td><td>${esc(v.status)}${v.note ? `<div class="muted small">${esc(v.note)}</div>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function promptBlock(text, label, act, id) {
+  return `<div class="row"><button class="btn primary" type="button" data-act="${act}" data-id="${esc(id)}" data-label="${esc(label)}">${esc(label)}</button><details><summary>Show task text</summary></details></div><textarea class="prompt-text" hidden readonly>${esc(text)}</textarea>`;
+}
+
+function optionCard(r, item, o) {
+  const chosen = (pending[r.id] || {})[item.id] || r.picks[item.id];
+  const prices = Object.entries(o.apps).map(([a, p]) => `${esc(appName(a))} <strong>${inr(p.price)}</strong>${p.unitPrice ? ` (${inr(p.unitPrice)}${esc(p.unit)})` : ''}`).join('<br>');
+  const rated = Object.values(o.apps).find((p) => p.rating);
+  return `<button type="button" class="opt" aria-pressed="${chosen === o.id}" data-act="pick" data-id="${esc(r.id)}" data-item="${esc(item.id)}" data-opt="${esc(o.id)}">
+    <span class="b">${esc(o.brand)}</span><span class="n">${esc(o.name)}${o.sizeMismatch ? '<span class="tag">size differs</span>' : ''}</span>
+    <span class="p">${esc(o.sizeText)}${rated ? ` · ★ ${esc(rated.rating)}` : ''}</span><span class="p">${prices}</span></button>`;
+}
+
+function pickView(r) {
+  const items = r.shortlist.items;
+  const left = items.filter((it) => it.options.length && !((pending[r.id] || {})[it.id] || r.picks[it.id])).length;
+  return items.map((it) => `<div class="item"><div class="item-name">${esc(it.text)}${r.picks[it.id] && it.autoPick === r.picks[it.id] ? ' <small>· your usual</small>' : ''}</div>
+    ${it.options.length ? `<div class="options">${it.options.map((o) => optionCard(r, it, o)).join('')}</div>` : '<div class="muted small">Nothing suitable on either app. Try different wording in a new request.</div>'}</div>`).join('')
+    + `<div class="row"><button class="btn primary" type="button" data-act="save-picks" data-id="${esc(r.id)}" ${left ? 'disabled' : ''}>${left ? `Pick ${left} more` : 'Compare apps'}</button></div>`;
+}
+
+function compareView(r, actionable) {
+  const c = r.comparison;
+  const rows = c.apps.map((a) => a.unavailable
+    ? `<tr><td>${esc(appName(a.app))}</td><td colspan="5" class="muted">${esc(a.reason)}</td></tr>`
+    : `<tr class="${a.app === c.recommended ? 'rec' : ''}"><td>${esc(appName(a.app))}${a.app === c.recommended ? '<span class="rec-tag">Best</span>' : ''}</td><td>${inr(a.total)}</td><td>${inr(a.walletUsable)}</td><td>${inr(a.payable)}</td><td>${Math.round(a.coverage * 100)}%${a.substitutions ? ` · ${a.substitutions} swap` : ''}</td><td>${a.etaMins != null ? esc(a.etaMins) + ' min' : '—'}</td></tr>`).join('');
+  const v = c.voucher;
+  const tip = v ? `<div class="note">Wallet is short by ${inr(v.shortfall)}. Buy a ${v.buy.map(inr).join(' + ')} ${esc(appName(v.app))} voucher on iShop${v.saves ? ` (saves ${inr(v.saves)})` : ''}, redeem it, then compare again.</div>` : '';
+  const btns = actionable ? `<div class="row">${c.apps.filter((a) => !a.unavailable && a.coverage > 0).map((a) => `<button class="btn ${a.app === c.recommended ? 'primary' : ''}" type="button" data-act="approve" data-id="${esc(r.id)}" data-app="${esc(a.app)}">Use ${esc(appName(a.app))}</button>`).join('')}<button class="btn quiet" type="button" data-act="recompare" data-id="${esc(r.id)}">Compare again with latest balances</button></div>` : '';
+  return `<div class="tbl"><table><thead><tr><th>App</th><th>Total</th><th>Wallet</th><th>You pay</th><th>Items</th><th>Delivery</th></tr></thead><tbody>${rows}</tbody></table></div><p class="muted small" style="margin:6px 0 0">Totals include estimated fees; the real bill comes from the cart.</p>${tip}${btns}`;
+}
+
+function billView(r) {
+  const c = r.cart;
+  const fees = Object.entries(c.fees || {}).filter(([, v]) => v).map(([k, v]) => `<li><span>${esc(k[0].toUpperCase() + k.slice(1))}</span><span>${inr(v)}</span></li>`).join('');
+  return `<ul class="bill"><li><span>Items</span><span>${inr(c.subtotal)}</span></li>${fees}<li><span>Total</span><span>${inr(c.total)}</span></li><li><span>Wallet applied</span><span>− ${inr(c.walletApplied)}</span></li><li class="total"><span>You pay</span><span>${inr(c.payable ?? c.total)}</span></li></ul>
+    ${c.missing && c.missing.length ? `<div class="note">Not added: ${esc(c.missing.join(', '))}</div>` : ''}${c.notes ? `<p class="muted small">${esc(c.notes)}</p>` : ''}
+    ${r.status === 'cart_ready' ? `<div class="row"><button class="btn primary" type="button" data-act="placed" data-id="${esc(r.id)}">I placed the order</button></div>` : ''}`;
+}
+
+function requestCard(r) {
+  const [label, tone] = STATUS[r.status] || [r.status, ''];
+  const title = r.type === 'redeem' ? `Add vouchers · ${r.apps.map(appName).join(', ')}` : r.items.map((x) => x.text).join(', ');
+  let body = '';
+  if (r.type === 'redeem' && r.status === 'redeeming') {
+    const known = S.vouchers.filter((v) => r.apps.includes(v.app));
+    body = `<div class="step">Copy the task, paste it into Claude in Chrome, then paste its reply in the box at the top.</div>${promptBlock(L.prompts.redeemPrompt(known, r.apps), 'Copy redeem task', 'copy', r.id)}`;
+  } else if (r.status === 'searching') {
+    body = `<div class="step">Copy the search task, paste it into Claude in Chrome, then paste its reply in the box at the top. It checks both sites and your wallets.</div>${promptBlock(L.prompts.searchPrompt(r, S.profile, PREFS.delivery && PREFS.delivery.pincode), 'Copy search task', 'copy', r.id)}`;
+  } else if (r.status === 'needs_pick') body = pickView(r);
+  else if (r.status === 'needs_approval') body = compareView(r, true);
+  else if (r.status === 'approved') {
+    const row = r.comparison.apps.find((a) => a.app === r.approval.app);
+    body = `<div class="step">Copy the cart task for ${esc(appName(row.app))} and paste it into Claude in Chrome. It fills the cart and stops at the bill; paste its reply at the top.</div>${promptBlock(L.prompts.cartPrompt(r, appName(row.app), row), `Copy ${appName(row.app)} cart task`, 'copy', r.id)}`;
+  } else if (['cart_ready', 'done'].includes(r.status) && r.cart) body = billView(r);
+  const cancel = !['done', 'cancelled'].includes(r.status) ? `<button class="btn quiet" type="button" data-act="cancel" data-id="${esc(r.id)}">Cancel</button>` : '';
+  return `<article class="card req" data-req="${esc(r.id)}"><div class="req-top"><div><div class="req-title">${esc(title)}</div><div class="muted small">${esc(r.id)} · ${esc(r.stage || '')}</div></div><span class="pill ${tone}">${esc(label)}</span></div>${body}${cancel ? `<div class="row">${cancel}</div>` : ''}</article>`;
+}
+
+function renderRequests() {
+  const list = S.requests.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  $('#requests').innerHTML = list.length ? list.map(requestCard).join('') : '<div class="empty">No requests yet. Add your grocery list above, or add vouchers to your wallets.</div>';
+}
+
+function renderAll() { renderWallets(); renderTaste(); renderVouchers(); renderRequests(); }
+
+// ---------- actions ----------
+const byId = (id) => S.requests.find((r) => r.id === id);
+
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('[data-act], #tabBuy, #tabRedeem, details summary');
+  if (!t) return;
+  if (t.matches('details summary')) { e.preventDefault(); const box = t.closest('.req, .tile')?.querySelector('.prompt-text'); if (box) box.hidden = !box.hidden; return; }
+  if (t.id === 'tabBuy' || t.id === 'tabRedeem') {
+    const buy = t.id === 'tabBuy';
+    $('#tabBuy').setAttribute('aria-selected', String(buy)); $('#tabRedeem').setAttribute('aria-selected', String(!buy));
+    $('#buyForm').hidden = !buy; $('#redeemForm').hidden = buy; return;
+  }
+  const act = t.dataset.act; const id = t.dataset.id;
+  if (act === 'copy' || act === 'copy-wallets') { const box = t.closest('.req, .tile').querySelector('.prompt-text'); copyText(box.value, t); return; }
+  if (act === 'pick') { (pending[id] ||= {})[t.dataset.item] = t.dataset.opt; renderRequests(); return; }
+  if (!db || S.readOnly) return;
+  t.disabled = true;
+  try {
+    const r0 = id && byId(id); const r = r0 && structuredClone(r0);
+    if (act === 'save-picks') { r.picks = { ...r.picks, ...(pending[id] || {}) }; delete pending[id]; await saveRequest(afterPicks(r)); }
+    if (act === 'recompare') { await saveRequest(afterPicks(r)); }
+    if (act === 'approve') { r.status = 'approved'; r.approval = { app: t.dataset.app, at: nowIso() }; r.stage = `Approved ${appName(t.dataset.app)}. Next: fill the cart`; await saveRequest(r); }
+    if (act === 'placed') { r.status = 'done'; r.stage = 'Order placed'; r.doneAt = nowIso(); await saveRequest(r); }
+    if (act === 'cancel') { r.status = 'cancelled'; r.stage = 'Cancelled'; await saveRequest(r); }
+    if (act === 'untaste') {
+      const kind = t.dataset.kind; const p = structuredClone(S.profile);
+      p[kind] = (p[kind] || []).filter((x) => !(x.brand === t.dataset.brand && (x.item || '') === t.dataset.item));
+      await db.doc('profile/main').set(p);
+    }
+  } catch (err) { setMsg('#pasteMsg', 'Couldn\'t save: ' + (err.message || err.code || 'try again'), 'err'); }
+  t.disabled = false;
+});
+
+$('#pasteSave').addEventListener('click', async (e) => { e.target.disabled = true; await handlePaste(); e.target.disabled = false; });
+
+$('#buyForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!db) { setMsg('#buyMsg', 'Still connecting to your saved data. Try again in a moment.', 'err'); return; }
+  const items = L.text.parseItemList($('#items').value);
+  if (!items.length) { setMsg('#buyMsg', 'Add at least one item.', 'err'); return; }
+  const r = { id: newId(), type: 'purchase', status: 'searching', stage: 'Next: run the search task in Claude in Chrome', createdAt: nowIso(),
+    items, preferredApp: $('#prefApp').value || null, budget: Number($('#budget').value) || null, picks: {}, results: {} };
+  try { await saveRequest(r); $('#items').value = ''; $('#budget').value = ''; setMsg('#buyMsg', `Created ${r.id}. Copy its search task below.`, 'ok'); }
+  catch (err) { setMsg('#buyMsg', 'Couldn\'t save: ' + (err.message || err.code), 'err'); }
+});
+
+$('#redeemForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!db) { setMsg('#redeemMsg', 'Still connecting to your saved data. Try again in a moment.', 'err'); return; }
+  const apps = ['#rdBlinkit', '#rdBigbasket'].filter((s) => $(s).checked).map((s) => $(s).value);
+  if (!apps.length) { setMsg('#redeemMsg', 'Pick at least one app.', 'err'); return; }
+  const r = { id: newId(), type: 'redeem', status: 'redeeming', stage: 'Next: run the redeem task in Claude in Chrome', createdAt: nowIso(), apps };
+  try { await saveRequest(r); setMsg('#redeemMsg', `Created ${r.id}. Copy its task below.`, 'ok'); }
+  catch (err) { setMsg('#redeemMsg', 'Couldn\'t save: ' + (err.message || err.code), 'err'); }
+});
+
+async function taste(kind) {
+  const brand = $('#tasteBrand').value.trim();
+  if (!brand) { setMsg('#tasteMsg', 'Type a brand first.', 'err'); return; }
+  try {
+    await db.doc('profile/main').set(L.taste.withPreference(S.profile, kind, brand, $('#tasteItem').value.trim()));
+    $('#tasteBrand').value = ''; $('#tasteItem').value = '';
+    setMsg('#tasteMsg', kind === 'likes' ? `Saved: you like ${brand}.` : `Saved: ${brand} won't show again.`, 'ok');
+  } catch (err) { setMsg('#tasteMsg', 'Couldn\'t save: ' + (err.message || err.code), 'err'); }
+}
+$('#likeBtn').addEventListener('click', () => taste('likes'));
+$('#avoidBtn').addEventListener('click', () => taste('dislikes'));
+
+// ---------- boot ----------
+renderAll();
+(async () => {
+  const timer = setTimeout(() => { if (!S.ready) $('#memo').textContent = 'Can\'t reach your saved data yet. Check you\'re signed in to claude.ai.'; }, 10000);
+  db = await window.claude?.use?.('db');
+  if (!db) {
+    clearTimeout(timer); S.readOnly = true;
+    $('#memo').textContent = 'Open this page while signed in to claude.ai to save requests.';
+    $('#requests').innerHTML = '<div class="empty">Your requests appear here once the page can reach your saved data.</div>';
+    return;
+  }
+  const fail = (e) => { $('#memo').textContent = 'Lost connection to your saved data (' + (e.code || 'error') + '). Reload the page.'; };
+  const live = (snap) => { if (!snap.metadata.fromCache) { S.ready = true; clearTimeout(timer); } };
+  db.collection('requests').orderBy('createdAt', 'desc').limit(40).onSnapshot((s) => { live(s); S.requests = s.docs.map((d) => d.data()); renderRequests(); }, fail);
+  db.collection('wallets').onSnapshot((s) => { live(s); S.wallets = Object.fromEntries(s.docs.map((d) => [d.id, d.data()])); renderWallets(); renderRequests(); }, fail);
+  db.collection('vouchers').onSnapshot((s) => { live(s); S.vouchers = s.docs.map((d) => d.data()); renderVouchers(); }, fail);
+  db.collection('history').orderBy('at', 'desc').limit(500).onSnapshot((s) => { live(s); S.history = s.docs.map((d) => d.data()); renderTaste(); }, fail);
+  db.doc('profile/main').onSnapshot((d) => { if (!d.metadata.fromCache) { S.ready = true; clearTimeout(timer); } S.profile = d.exists ? { ...L.taste.emptyProfile(), ...d.data() } : L.taste.emptyProfile(); renderTaste(); renderRequests(); }, fail);
+})();
+</script>

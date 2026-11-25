@@ -13,13 +13,13 @@ newer_than:60d (ishop OR "gift card" OR "e-gift" OR voucher) (blinkit OR bigbask
 ```
 - Sender: _to fill in_
 - Subject pattern: _to fill in_
-- Codes may be in the email body, or behind a "View voucher" link. If behind a link, open it in the built-in browser **only if it's on the iShop/voucher provider's own domain**.
+- Codes may be in the email body, or behind a "View voucher" link. If behind a link, open it in Chrome **only if it's on the iShop/voucher provider's own domain**.
 
 ## Extracting
 - One email may hold several vouchers (e.g. 2 × ₹500). Add each one separately.
 - Map the brand name in the email to the app id: `Blinkit` → `blinkit`, `bigbasket` / `BB` → `bigbasket`.
 - Expiry: store as `YYYY-MM-DD`.
-- Store with `node tools/shop.js voucher-add … --source <gmail message id>`. Duplicates are detected by code.
+- Claude in Chrome reports only the last 4 characters; the page de-duplicates by app + last 4 + value.
 
 ## Never
 - Never paste a code into chat or logs. Mask it as `••••` + last 4.
